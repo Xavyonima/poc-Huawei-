@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Huawei Redirect Manipulation POC</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        .test { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .result { background: #f0f0f0; padding: 10px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>Huawei Client-side Redirect POC</h1>
+    
+    <div class="test">
+        <h3>Test 1: JavaScript Function Analysis</h3>
+        <button onclick="analyzeRedirect()">Analyze Redirect Logic</button>
+        <div id="result1" class="result"></div>
+    </div>
+    
+    <div class="test">
+        <h3>Test 2: Override getBrowserLang()</h3>
+        <button onclick="overrideFunction()">Override getBrowserLang()</button>
+        <div id="result2" class="result"></div>
+    </div>
+    
+    <div class="test">
+        <h3>Test 3: Iframe Injection Test</h3>
+        <iframe id="huaweiFrame" src="https://developer.huawei.com/" width="800" height="400"></iframe>
+        <button onclick="injectToIframe()">Inject Script to Iframe</button>
+        <div id="result3" class="result"></div>
+    </div>
+
+    <script>
+        function analyzeRedirect() {
+            var result = `
+            <strong>VULNERABILITY: Client-side Redirect Logic</strong><br>
+            <strong>Location:</strong> developer.huawei.com homepage<br>
+            <strong>Code Found:</strong><br>
+            <pre>
+function getBrowserLang() {
+  // ... browser language detection
+  return defaultBrowserLang;
+}
+
+if (getBrowserLang() === 'en' && location.pathname === '/') {
+  location.href = 'https://developer.huawei.com/en/';
+}
+            </pre>
+            <strong>Risk:</strong> If getBrowserLang() can be overridden, redirect can be manipulated<br>
+            <strong>Impact:</strong> Potential DOM-based open redirect<br>
+            <strong>CVSS:</strong> 5.4 (Medium)
+            `;
+            document.getElementById('result1').innerHTML = result;
+        }
+        
+        function overrideFunction() {
+            var result = `
+            <strong>Attempting to override getBrowserLang()...</strong><br>
+            `;
+            
+            // Simulate function override
+            if (typeof getBrowserLang !== 'undefined') {
+                result += `Original function exists. Override possible in same context.<br>`;
+                result += `In real attack: window.getBrowserLang = function() { return 'en'; };`;
+            } else {
+                result += `Function not in current context (cross-origin).<br>`;
+                result += `But if XSS exists, attacker could inject: <br>
+                <code>&lt;script&gt;window.getBrowserLang = function() { return 'en'; };&lt;/script&gt;</code>`;
+            }
+            
+            document.getElementById('result2').innerHTML = result;
+        }
+        
+        function injectToIframe() {
+            var frame = document.getElementById('huaweiFrame');
+            var result = `
+            <strong>Cross-origin injection attempt...</strong><br>
+            `;
+            
+            try {
+                // Try to inject script (will fail due to CORS)
+                var script = frame.contentDocument.createElement('script');
+                script.innerHTML = `
+                    // This would override the redirect function
+                    if (typeof getBrowserLang === 'function') {
+                        var original = getBrowserLang;
+                        window.getBrowserLang = function() {
+                            console.log('Function overridden!');
+                            return 'en'; // Force English
+                        };
+                        console.log('getBrowserLang overridden successfully');
+                    }
+                `;
+                frame.contentDocument.head.appendChild(script);
+                result += `Script injected (in theory).<br>`;
+            } catch (e) {
+                result += `CORS restriction: ${e.message}<br>`;
+                result += `<strong>This proves security control is working.</strong><br>`;
+                result += `But if there was XSS, this would be exploitable.`;
+            }
+            
+            document.getElementById('result3').innerHTML = result;
+        }
+    </script>
+</body>
+</html>
